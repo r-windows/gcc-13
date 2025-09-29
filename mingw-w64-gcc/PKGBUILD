@@ -5,25 +5,17 @@
 # Contributor: wirx6 <wirx654@gmail.com>
 # Contributor: Kirill Müller <krlmlr@mailbox.org>
 
-_enable_ada=yes
-_enable_objc=yes
+_enable_ada=no
+_enable_objc=no
 _enable_rust=no
-_enable_jit=yes
+_enable_jit=no
 
 _threads="posix"
 
 _realname=gcc
 pkgbase=mingw-w64-${_realname}
 pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}"
-         "${MINGW_PACKAGE_PREFIX}-${_realname}-libs"
-         "${MINGW_PACKAGE_PREFIX}-${_realname}-libgfortran"
-         "${MINGW_PACKAGE_PREFIX}-${_realname}-fortran"
-         "${MINGW_PACKAGE_PREFIX}-${_realname}-lto-dump"
-         $([[ "$_enable_ada" == "yes" ]] && echo "${MINGW_PACKAGE_PREFIX}-${_realname}-ada")
-         $([[ "$_enable_objc" == "yes" ]] && echo "${MINGW_PACKAGE_PREFIX}-${_realname}-objc")
-         $([[ "$_enable_rust" == "yes" ]] && echo "${MINGW_PACKAGE_PREFIX}-${_realname}-rust")
-         $([[ "$_enable_jit" == "yes" ]] && echo "${MINGW_PACKAGE_PREFIX}-libgccjit")
-        )
+         "${MINGW_PACKAGE_PREFIX}-${_realname}-fortran")
 #_snapshot=20181214
 pkgver=13.2.0
 #_majorver=${pkgver:0:1}
@@ -40,7 +32,6 @@ msys2_references=(
 )
 license=('spdx:GPL-3.0-or-later')
 makedepends=("${MINGW_PACKAGE_PREFIX}-${_realname}"
-             $([[ "$_enable_ada" == "yes" ]] && echo "${MINGW_PACKAGE_PREFIX}-${_realname}-ada")
              "${MINGW_PACKAGE_PREFIX}-binutils"
              "${MINGW_PACKAGE_PREFIX}-crt"
              "${MINGW_PACKAGE_PREFIX}-headers"
@@ -295,48 +286,6 @@ build() {
           profiledbootstrap
 }
 
-package_gcc-libs() {
-  pkgdesc="GNU Compiler Collection (libraries) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-libwinpthread")
-  provides=("${MINGW_PACKAGE_PREFIX}-omp")
-
-  # Licensing information
-
-  # Part of the package is GCCRLE, part is LGPL-2.1-or-later, see README generation below.
-  # Since the packaged GCCRLE libraries are also spdx:GPL-3.0-or-later,
-  # and LGPL-2.1-or-later is compatible with GPL-3.0-or-later, the whole package can
-  # be redistributed under GPL-3.0-or-later.
-  license=('spdx:GPL-3.0-or-later WITH GCC-exception-3.1 AND LGPL-2.1-or-later')
-
-  cd "${srcdir}"/build-${MSYSTEM}
-
-  make -C $CHOST/libgcc DESTDIR="${pkgdir}" install-shared
-  install -dm755 "${pkgdir}"${MINGW_PREFIX}/bin
-  mv "${pkgdir}"/libgcc_*.dll "${pkgdir}"${MINGW_PREFIX}/bin/
-
-  # libitm* and libvtv* are disbled until fixed
-  for lib in libatomic libgomp libquadmath libstdc++-v3/src; do
-    make -C $CHOST/$lib DESTDIR="${pkgdir}" install-toolexeclibLTLIBRARIES
-  done
-
-  rm -r "${pkgdir}"${MINGW_PREFIX}/lib
-
-  make -C $CHOST/libstdc++-v3/po DESTDIR="${pkgdir}" install
-
-  # We explain the licensing in this generated README file
-  mkdir -p "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-libs
-  cat << ENDFILE > "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-libs/README
-The libgcc, libstdc++, libgomp and libatomic libraries are covered by
-GPL-3.0-or-later with GCC-exception-3.1. The libquadmath library is covered
-by LGPL-2.1-or-later. The package as a whole can be redistributed under GPL-3.0-or-later.
-ENDFILE
-
-  # License files
-  install -Dm644 "${srcdir}"/${_sourcedir}/COPYING3        "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-libs/COPYING3
-  install -Dm644 "${srcdir}"/${_sourcedir}/COPYING.LIB     "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-libs/COPYING.LIB
-  install -Dm644 "${srcdir}"/${_sourcedir}/COPYING.RUNTIME "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-libs/COPYING.RUNTIME
-}
-
 package_gcc() {
   pkgdesc="GNU Compiler Collection (C,C++,OpenMP) for MinGW-w64"
   depends=("${MINGW_PACKAGE_PREFIX}-binutils"
@@ -347,7 +296,7 @@ package_gcc() {
            "${MINGW_PACKAGE_PREFIX}-gmp"
            "${MINGW_PACKAGE_PREFIX}-mpfr"
            "${MINGW_PACKAGE_PREFIX}-mpc"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
+           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs"
            "${MINGW_PACKAGE_PREFIX}-windows-default-manifest"
            "${MINGW_PACKAGE_PREFIX}-winpthreads"
            "${MINGW_PACKAGE_PREFIX}-zlib"
@@ -425,24 +374,11 @@ package_gcc() {
   # ${MINGW_PREFIX}/bin/python -m compileall -o 0 -o 1 "${pkgdir}"${MINGW_PREFIX}/share/gcc-${pkgver%%+*}/
 }
 
-package_gcc-libgfortran() {
-  pkgdesc="GNU Compiler Collection (libgfortran) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-libwinpthread")
-  provides=("${MINGW_PACKAGE_PREFIX}-fc-libs")
-
-  cd "${srcdir}"/build-${MSYSTEM}
-  make -C $CHOST/libgfortran DESTDIR="${pkgdir}" install-toolexeclibLTLIBRARIES
-  rm -r "${pkgdir}"${MINGW_PREFIX}/lib
-
-  install -Dm644 "${srcdir}"/${_sourcedir}/COPYING.RUNTIME "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-libgfortran/COPYING.RUNTIME
-}
-
 package_gcc-fortran() {
   pkgdesc="GNU Compiler Collection (Fortran) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}=$pkgver-$pkgrel"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libgfortran=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
+  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}"
+           "${MINGW_PACKAGE_PREFIX}-${_realname}-libgfortran"
+           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs"
            "${MINGW_PACKAGE_PREFIX}-gmp"
            "${MINGW_PACKAGE_PREFIX}-isl"
            "${MINGW_PACKAGE_PREFIX}-libwinpthread"
@@ -459,101 +395,6 @@ package_gcc-fortran() {
   make -C $CHOST/libgomp DESTDIR="${pkgdir}" install-nodist_fincludeHEADERS
   make -C gcc DESTDIR="${pkgdir}" fortran.install-{common,man,info}
   install -Dm755 gcc/f951.exe "${pkgdir}"${MINGW_PREFIX}/${_libdir}/f951.exe
-}
-
-package_gcc-ada() {
-  pkgdesc="GNU Compiler Collection (Ada) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}=$pkgver-$pkgrel"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-gmp"
-           "${MINGW_PACKAGE_PREFIX}-isl"
-           "${MINGW_PACKAGE_PREFIX}-libwinpthread"
-           "${MINGW_PACKAGE_PREFIX}-mpc"
-           "${MINGW_PACKAGE_PREFIX}-mpfr"
-           "${MINGW_PACKAGE_PREFIX}-zlib"
-           "${MINGW_PACKAGE_PREFIX}-zstd")
-
-  cd "${srcdir}"/build-${MSYSTEM}
-
-  make -C gcc DESTDIR="${pkgdir}" ada.install-{common,info} install-gnatlib
-  mv "${pkgdir}"${MINGW_PREFIX}/${_libdir}/adalib/*.dll "${pkgdir}"${MINGW_PREFIX}/bin/
-  install -m755 gcc/gnat1.exe "${pkgdir}"${MINGW_PREFIX}/${_libdir}
-}
-
-package_gcc-objc() {
-  pkgdesc="GNU Compiler Collection (ObjC,Obj-C++) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}=$pkgver-$pkgrel"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-gmp"
-           "${MINGW_PACKAGE_PREFIX}-isl"
-           "${MINGW_PACKAGE_PREFIX}-libwinpthread"
-           "${MINGW_PACKAGE_PREFIX}-mpc"
-           "${MINGW_PACKAGE_PREFIX}-mpfr"
-           "${MINGW_PACKAGE_PREFIX}-zlib"
-           "${MINGW_PACKAGE_PREFIX}-zstd")
-
-  cd "${srcdir}"/build-${MSYSTEM}
-
-  make -C $CHOST/libobjc DESTDIR="${pkgdir}" install-libs
-  make -C $CHOST/libobjc DESTDIR="${pkgdir}" install-headers
-  install -dm755 "${pkgdir}"${MINGW_PREFIX}/${_libdir}
-  install -m755 gcc/cc1obj{,plus}.exe "${pkgdir}"${MINGW_PREFIX}/${_libdir}/
-
-  install -Dm644 "${srcdir}/${_sourcedir}/COPYING.RUNTIME" "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}-objc/COPYING.RUNTIME
-}
-
-package_gcc-rust() {
-  pkgdesc="GNU Compiler Collection (Rust) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}=$pkgver-$pkgrel"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-gmp"
-           "${MINGW_PACKAGE_PREFIX}-isl"
-           "${MINGW_PACKAGE_PREFIX}-libwinpthread"
-           "${MINGW_PACKAGE_PREFIX}-mpc"
-           "${MINGW_PACKAGE_PREFIX}-mpfr"
-           "${MINGW_PACKAGE_PREFIX}-zlib"
-           "${MINGW_PACKAGE_PREFIX}-zstd")
-
-  cd "${srcdir}"/build-${MSYSTEM}
-
-  make -C gcc DESTDIR="${pkgdir}" rust.install-{common,man,info}
-
-  install -Dm755 gcc/gccrs.exe "${pkgdir}"${MINGW_PREFIX}/bin/gccrs.exe
-  install -Dm755 gcc/rust1.exe "${pkgdir}"${MINGW_PREFIX}/${_libdir}/rust1.exe
-}
-
-package_gcc-lto-dump() {
-  pkgdesc="Dump link time optimization object files (mingw-w64)"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}=$pkgver-$pkgrel"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-gmp"
-           "${MINGW_PACKAGE_PREFIX}-isl"
-           "${MINGW_PACKAGE_PREFIX}-libwinpthread"
-           "${MINGW_PACKAGE_PREFIX}-mpc"
-           "${MINGW_PACKAGE_PREFIX}-mpfr"
-           "${MINGW_PACKAGE_PREFIX}-zlib"
-           "${MINGW_PACKAGE_PREFIX}-zstd")
-
-  cd "${srcdir}"/build-${MSYSTEM}
-
-  make -C gcc DESTDIR="${pkgdir}" lto.install-{common,man,info}
-}
-
-package_libgccjit() {
-  pkgdesc="GNU Compiler Collection (libgccjit) for MinGW-w64"
-  depends=("${MINGW_PACKAGE_PREFIX}-${_realname}=$pkgver-$pkgrel"
-           "${MINGW_PACKAGE_PREFIX}-${_realname}-libs=${pkgver}-${pkgrel}"
-           "${MINGW_PACKAGE_PREFIX}-gmp"
-           "${MINGW_PACKAGE_PREFIX}-isl"
-           "${MINGW_PACKAGE_PREFIX}-libwinpthread"
-           "${MINGW_PACKAGE_PREFIX}-mpc"
-           "${MINGW_PACKAGE_PREFIX}-mpfr"
-           "${MINGW_PACKAGE_PREFIX}-zlib"
-           "${MINGW_PACKAGE_PREFIX}-zstd")
-
-  cd "${srcdir}"/build-${MSYSTEM}
-
-  make -C gcc DESTDIR="${pkgdir}" jit.install-common jit.install-info
 }
 
 # template start; name=mingw-w64-splitpkg-wrappers; version=1.0;
